@@ -5,10 +5,10 @@ fn handle_request(mut stream: TcpStream) {
     let mut buffer = [0; 1024];
     let ping = b"*1\r\n$4\r\nping\r\n";
 
-    stream.read_exact(&mut buffer).unwrap();
+    stream.read(&mut buffer).unwrap();
 
     if buffer.starts_with(ping) {
-        stream.write_all(b"+PONG\r\n").unwrap();
+        stream.write(b"+PONG\r\n").unwrap();
         stream.flush().unwrap();
     }
 }
