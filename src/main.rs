@@ -1,14 +1,25 @@
-use tokio::net::TcpListener;
-use std::io;
+use std::net::{TcpListener, TcpStream};
+use std::io::prelude::*;
 
-#[tokio::main]
-async fn main() -> io::Result<()> {
-    let mut listener = TcpListener::bind("127.0.0.1:6379").await?;
+fn handle_request(mut stream: TcpStream) {
+    let mut buffer = [0; 1024];
+    let ping = b"*1\r\n$4\r\nping\r\n";
 
-    match listener.accept().await {
-        Ok((_socket, addr)) => println!("new client: {:?}", addr),
-        Err(e) => println!("couldn't get client: {:?}", e),
+    stream.read_exact(&mut buffer).unwrap();
+
+    if buffer.starts_with(ping) {
+        stream.write_all(b"+PONG\r\n").unwrap();
+        stream.flush().unwrap();
     }
+}
 
+fn main() -> std::io::Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:6379")?;
+
+    // accept connections and process them serially
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+        handle_request(stream);
+    }
     Ok(())
 }
