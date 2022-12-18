@@ -1,15 +1,24 @@
-use std::net::{TcpListener, TcpStream};
+use std::{net::{TcpListener, TcpStream}, thread};
 use std::io::prelude::*;
 
-fn handle_request(mut stream: TcpStream) {
-    let mut buffer = [0; 1024];
-    let ping = b"*1\r\n$4\r\nping\r\n";
-
-    stream.read(&mut buffer).unwrap();
-
-    if buffer.starts_with(ping) {
-        stream.write(b"+PONG\r\n").unwrap();
-        stream.flush().unwrap();
+fn handle_redis_requests(mut stream: TcpStream) {
+    let remote_addr = stream.peer_addr().unwrap();
+    println!("accepted new connection from {}", remote_addr);
+    loop {
+        let mut buffer = [0; 1024];
+        match stream.read(&mut buffer) {
+            Ok(_size) => match stream.write(b"+PONG\r\n") {
+                Ok(_) => continue,
+                Err(e) => {
+                    println!("error writing to the stream: {}", e);
+                    break;
+                }
+            }
+            Err(e) => {
+                println!("error reading from the stream: {}", e);
+                break;
+            }
+        }
     }
 }
 
@@ -18,8 +27,16 @@ fn main() -> std::io::Result<()> {
 
     // accept connections and process them serially
     for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        handle_request(stream);
+        match stream {
+            Ok(stream) => {
+                thread::spawn(|| {
+                    handle_redis_requests(stream);
+                });
+            }
+            Err(e) => {
+                println!("error: {}", e)
+            }
+        }
     }
     Ok(())
 }
