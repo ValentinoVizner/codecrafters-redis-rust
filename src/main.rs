@@ -1,13 +1,14 @@
-use std::{net::{TcpListener, TcpStream}, thread};
-use std::io::prelude::*;
+use anyhow::Result;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 
-fn handle_redis_requests(mut stream: TcpStream) {
+async fn handle_requests(mut stream: TcpStream) {
     let remote_addr = stream.peer_addr().unwrap();
     println!("accepted new connection from {}", remote_addr);
     loop {
         let mut buffer = [0; 1024];
-        match stream.read(&mut buffer) {
-            Ok(_size) => match stream.write(b"+PONG\r\n") {
+        match stream.read(&mut buffer).await {
+            Ok(_size) => match stream.write("+PONG\r\n".as_bytes()).await {
                 Ok(_) => continue,
                 Err(e) => {
                     println!("error writing to the stream: {}", e);
@@ -22,15 +23,17 @@ fn handle_redis_requests(mut stream: TcpStream) {
     }
 }
 
-fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:6379")?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:6379").await?;
 
-    // accept connections and process them serially
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                thread::spawn(|| {
-                    handle_redis_requests(stream);
+    loop {
+        // accept connections and process them serially
+        let incoming = listener.accept().await;
+        match incoming {
+            Ok((stream, _)) => {
+                tokio::spawn( async move{
+                    handle_requests(stream).await;
                 });
             }
             Err(e) => {
@@ -38,5 +41,4 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
-    Ok(())
 }
