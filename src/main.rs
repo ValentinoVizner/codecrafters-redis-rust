@@ -25,7 +25,7 @@ async fn handle_requests(mut stream: TcpStream) {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:6379").await?;
+    let mut listener = TcpListener::bind("127.0.0.1:6379").await?;
 
     loop {
         // accept connections and process them serially
